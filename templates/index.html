@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Канцелярия</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__title">⚖ Канцелярия суда</div>
+    <div class="topbar__user">
+      <div class="chip">{{ user.username }}</div>
+      <div class="chip chip--gold">{{ user.role }}</div>
+      <a class="link" href="/logout">Выйти</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel panel--form">
+      <h2>Создание дела</h2>
+      <p class="muted">Заполни форму. Дело будет зарегистрировано и получит номер автоматически.</p>
+
+      <label>Суд</label>
+      <select id="court">
+        <option value="" disabled selected>Выберите суд</option>
+        {% for c in courts %}
+          <option value="{{ c }}">{{ c }}</option>
+        {% endfor %}
+      </select>
+
+      <label>Наименование процесса</label>
+      <input id="title" placeholder="Например: взыскание алиментов">
+
+      <div class="grid2">
+        <div>
+          <label>Истец (ФИО)</label>
+          <input id="p1" placeholder="Фамилия Имя Отчество">
+          <label>Адрес</label>
+          <input id="p2" placeholder="Адрес">
+          <label>Телефон</label>
+          <input id="p3" placeholder="Телефон">
+        </div>
+        <div>
+          <label>Ответчик (ФИО)</label>
+          <input id="d1" placeholder="Фамилия Имя Отчество">
+          <label>Адрес</label>
+          <input id="d2" placeholder="Адрес">
+          <label>Телефон</label>
+          <input id="d3" placeholder="Телефон">
+        </div>
+      </div>
+
+      <label>Суть (кратко)</label>
+      <textarea id="text" rows="4" placeholder="Опишите обстоятельства..."></textarea>
+
+      <div class="grid2">
+        <div>
+          <label>Подпись (Фамилия И.О.)</label>
+          <input id="sign" placeholder="Фамилия И.О.">
+        </div>
+        <div>
+          <label>Дата</label>
+          <div class="grid3">
+            <input id="day" placeholder="01" maxlength="2">
+            <input id="month" placeholder="января">
+            <input id="year" placeholder="26" maxlength="2">
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="createCase()">Зарегистрировать</button>
+      <div id="msg" class="muted" style="margin-top:10px;"></div>
+    </section>
+
+    <section class="panel panel--list">
+      <h2>Реестр</h2>
+      <input class="search" id="q" placeholder="Поиск по номеру/статусу/суду" oninput="filterCases()">
+
+      <div class="table">
+        <div class="table__head">
+          <div>Дело</div><div>Суд</div><div>Статус</div><div>Дата</div>
+        </div>
+        <div id="rows">
+          {% for c in cases %}
+          <div class="table__row">
+            <div class="cnum">{{ c.case_num }}</div>
+            <div class="ccourt">{{ c.court }}</div>
+            <div class="cstatus">{{ c.status }}</div>
+            <div>{{ c.created_at.strftime('%d.%m.%Y %H:%M') }} UTC</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if not cases %}
+        <p class="muted">Пока нет доступных дел.</p>
+      {% endif %}
+    </section>
+  </main>
+
+<script>
+function filterCases(){
+  const q = (document.getElementById('q').value || '').toLowerCase();
+  document.querySelectorAll('.table__row').forEach(r=>{
+    const a = r.querySelector('.cnum')?.innerText.toLowerCase() || '';
+    const b = r.querySelector('.ccourt')?.innerText.toLowerCase() || '';
+    const c = r.querySelector('.cstatus')?.innerText.toLowerCase() || '';
+    r.style.display = (a.includes(q)||b.includes(q)||c.includes(q)) ? '' : 'none';
+  });
+}
+
+async function createCase(){
+  const court = document.getElementById('court').value;
+  const title = document.getElementById('title').value.trim();
+
+  const payload = {
+    plaintiff: { fio: p1.value, addr: p2.value, phone: p3.value },
+    defendant: { fio: d1.value, addr: d2.value, phone: d3.value },
+    text: document.getElementById('text').value,
+    sign: document.getElementById('sign').value,
+    date: { day: day.value, month: month.value, year: year.value }
+  };
+
+  const msg = document.getElementById('msg');
+  msg.textContent = '';
+
+  if(!court || !title){
+    msg.textContent = 'Заполните суд и наименование процесса.';
+    return;
+  }
+
+  const btn = document.querySelector('.btn-primary');
+  btn.disabled = true;
+  btn.textContent = 'Регистрация...';
+
+  const res = await fetch('/api/create_case', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ court, title, payload: JSON.stringify(payload) })
+  });
+
+  const data = await res.json();
+  if(res.ok && data.ok){
+    msg.textContent = 'Дело зарегистрировано: ' + data.case_num;
+    setTimeout(()=>location.reload(), 700);
+  }else{
+    msg.textContent = 'Ошибка: ' + (data.error || 'unknown');
+    btn.disabled = false;
+    btn.textContent = 'Зарегистрировать';
+  }
+}
+</script>
+</body>
+</html>
