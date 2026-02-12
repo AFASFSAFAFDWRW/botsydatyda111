@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Панель управления</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar__title">⚖ Панель управления</div>
+  <div class="topbar__user">
+    <div class="chip">{{ user.username }}</div>
+    <div class="chip chip--gold">{{ user.role }}</div>
+    <a class="link" href="/">К реестру</a>
+    <a class="link" href="/logout">Выйти</a>
+  </div>
+</header>
+
+<main class="wrap" style="grid-template-columns: 1fr;">
+  <section class="panel">
+    <h2>Роли Discord</h2>
+    <p class="muted">Выбери участника, выбери роль, нажми выдать/снять. Обновление каждые 5 сек.</p>
+
+    <div class="grid2">
+      <div>
+        <label>Участники</label>
+        <select id="members" size="12" style="height:300px;"></select>
+      </div>
+      <div>
+        <label>Роли</label>
+        <select id="roles" size="12" style="height:300px;"></select>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:12px;">
+      <button class="btn btn-primary" onclick="setRole('add')">Выдать роль</button>
+      <button class="btn btn-danger" onclick="setRole('remove')">Снять роль</button>
+    </div>
+
+    <div id="msg" class="muted" style="margin-top:10px;"></div>
+  </section>
+</main>
+
+<script>
+async function load(){
+  const [m, r] = await Promise.all([
+    fetch('/api/admin/members').then(x=>x.json()),
+    fetch('/api/admin/roles').then(x=>x.json())
+  ]);
+
+  const ms = document.getElementById('members');
+  const rs = document.getElementById('roles');
+
+  ms.innerHTML = '';
+  rs.innerHTML = '';
+
+  m.forEach(x=>{
+    const o = document.createElement('option');
+    o.value = x.id;
+    o.textContent = x.name + ' — ' + (x.roles?.join(', ') || '');
+    ms.appendChild(o);
+  });
+
+  r.forEach(x=>{
+    const o = document.createElement('option');
+    o.value = x.id;
+    o.textContent = x.name;
+    rs.appendChild(o);
+  });
+}
+
+async function setRole(action){
+  const member_id = document.getElementById('members').value;
+  const role_id = document.getElementById('roles').value;
+  const msg = document.getElementById('msg');
+
+  if(!member_id || !role_id){
+    msg.textContent = 'Выберите участника и роль.';
+    return;
+  }
+
+  const res = await fetch('/api/admin/set_role', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({member_id, role_id, action})
+  });
+  const data = await res.json();
+  msg.textContent = 'Результат: ' + (data.result || 'unknown');
+  await load();
+}
+
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>
